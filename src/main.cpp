@@ -68,6 +68,24 @@ int32_t GIFSeekFile(GIFFILE* gf, int32_t pos) {
   return pos;
 }
 
+bool playing = false;
+// Helper: open & start a file
+bool openGIF(const char *filename) {
+  gif.reset();                      // rewind any previous
+  if (!gif.open(filename,
+                GIFOpenFile, GIFCloseFile,
+                GIFReadFile,  GIFSeekFile,
+                GIFDraw)) {
+    Serial.printf("Failed to open %s\n", filename);
+    return false;
+  }
+  playing = true;
+  gfx->fillScreen(RGB565_BLACK);
+  Serial.printf("▶ Now playing %s\n", filename);
+  return true;
+}
+
+
 
 
 void setup() {
@@ -100,28 +118,49 @@ void setup() {
   gif.begin(LITTLE_ENDIAN_PIXELS);
 
 
-  // 4) Open the GIF with callbacks
-  if (!gif.open("/example.gif",
-                GIFOpenFile, GIFCloseFile,
-                GIFReadFile,  GIFSeekFile,
-                GIFDraw)) {
-    Serial.println("Failed to open GIF");
-    while (1);
-  }
+  // 2) init display
+  pinMode(GFX_BL, OUTPUT);
+  digitalWrite(GFX_BL, HIGH);
+  gfx->begin();
+  gfx->fillScreen(RGB565_BLACK);
+  // 3) init GIF decoder
+  gif.begin(LITTLE_ENDIAN_PIXELS);
+  // 4) open GIF on SDMMC
+
+  Serial.println("Ready. Send playgif1 or playgif2.");
 
   
 }
 
 void loop() {
-  if (!gif.playFrame(true, NULL)) {
-    gif.reset();  // loop back to start
+  
+
+
+
+// 1) Check for commands
+  if (Serial.available() && !playing) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == "playgif1") {
+      openGIF("/test1.gif");
+    }
+    else if (cmd == "playgif2") {
+      openGIF("/test2.gif");
+    }
   }
+
+  // 2) If playing, render next frame
+  if (playing) {
+    if (!gif.playFrame(true, NULL)) {
+      // animation finished
+      playing = false;
+      Serial.println("✔ Playback finished");
+    }
+  }
+
+
+  
 }
-
-
-
-
-
 
 /* 
 void setup() {
